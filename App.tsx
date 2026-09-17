@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Utensils, ShoppingBag, Sparkles } from 'lucide-react';
+import ReactDOM from 'react-dom/client';
+import { Utensils, Sparkles } from 'lucide-react';
 
-export default function App() {
+function App() {
   const [ing, setIng] = useState('');
   const [recipes, setRecipes] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,7 +30,7 @@ export default function App() {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6', padding: '20px', fontFamily: 'sans-serif' }}>
       <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-        <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', marginTo: 0 }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', marginTop: 0 }}>
           <Utensils /> Tarif Sepeti
         </h1>
         <p style={{ color: '#4b5563' }}>Elinizdeki malzemeleri yazın, yapay zeka size özel tarif üretsin!</p>
@@ -57,5 +58,15 @@ export default function App() {
         )}
       </div>
     </div>
+  );
+}
+
+// React'ı ekrandaki #root elementine bağlayan kısım:
+const rootElement = document.getElementById('root');
+if (rootElement) {
+  ReactDOM.createRoot(rootElement).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
   );
 }
