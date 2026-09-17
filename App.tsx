@@ -1,130 +1,61 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { Meal, UserProfile, FilterOptions } from './types';
-import { MEALS_DATABASE, checkMealAllergyConflict, getMealFoodTypes } from './data/meals';
-import { TURKEY_MARKETS, ALLERGY_OPTIONS } from './data/citiesAndMarkets';
-import { Header } from './components/Header';
-import { FoodDiscoveryHub } from './components/FoodDiscoveryHub';
-import { FilterBar } from './components/FilterBar';
-import { MealCard } from './components/MealCard';
-import { MealDetailModal } from './components/MealDetailModal';
-import { OnboardingFlow } from './components/OnboardingFlow';
-import { AiRecipeModal } from './components/AiRecipeModal';
-import { SheetsExportModal } from './components/SheetsExportModal';
-import { SponsoredAdBanner } from './components/SponsoredAdBanner';
-import { ProMembershipModal } from './components/ProMembershipModal';
-import { RewardedVideoAdModal } from './components/RewardedVideoAdModal';
-import { Sparkles, Store, MapPin, Wallet, ShieldCheck, Crown } from 'lucide-react';
+import React, { useState } from 'react';
+import { Utensils, ShoppingBag, Sparkles } from 'lucide-react';
 
-const DEFAULT_PROFILE: UserProfile = {
-  name: '',
-  age: 25,
-  gender: 'male',
-  weightKg: 74,
-  heightCm: 178,
-  city: 'Adana',
-  selectedMarkets: ['groseri', 'migros', 'a101', 'bim'],
-  allergies: [],
-  desiredFoods: ['any'],
-  calorieGoal: 'balanced',
-  proteinGoal: 'high',
-  carbGoal: 'balanced',
-  dietStyle: 'all',
-  budgetAmount: 90,
-  budgetType: 'per_meal',
-  estimatedTargetCalories: 2200
-};
+export default function App() {
+  const [ing, setIng] = useState('');
+  const [recipes, setRecipes] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-export function App() {
-  const [profile, setProfile] = useState<UserProfile>(() => {
+  const getRecipes = async () => {
+    if (!ing) return;
+    setLoading(true);
     try {
-      const saved = localStorage.getItem('user_meal_profile');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return {
-          ...DEFAULT_PROFILE,
-          ...parsed,
-          city: parsed.city || 'Adana',
-          selectedMarkets: parsed.selectedMarkets?.length ? parsed.selectedMarkets : ['groseri', 'migros', 'a101', 'bim'],
-          allergies: parsed.allergies || [],
-          desiredFoods: parsed.desiredFoods || ['any']
-        };
-      }
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.GEMINI_API_KEY;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: `Elimdeki malzemeler: ${ing}. Bu malzemelerle yapılabilecek hızlı ve lezzetli yemek tarifleri öner.` }] }]
+        })
+      });
+      const data = await res.json();
+      setRecipes(data.candidates?.[0]?.content?.parts?.[0]?.text || 'Tarif bulunamadı.');
     } catch (e) {
-      console.warn('Could not read user profile', e);
+      setRecipes('Bir hata oluştu, lütfen API anahtarınızı veya bağlantınızı kontrol edin.');
     }
-    return DEFAULT_PROFILE;
-  });
-
-  const [isOnboardingActive, setIsOnboardingActive] = useState<boolean>(() => {
-    return !localStorage.getItem('onboarding_completed_v3') || !profile.name;
-  });
-
-  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
-  const [selectedMeal, setSelectedMeal] = useState<Meal | null>(null);
-  const [isSheetsModalOpen, setIsSheetsModalOpen] = useState(false);
-  const [mealsForSheets, setMealsForSheets] = useState<Meal[]>([]);
-  const [isProModalOpen, setIsProModalOpen] = useState(false);
-  const [mealForVideoAd, setMealForVideoAd] = useState<Meal | null>(null);
-  const [unlockedMealIds, setUnlockedMealIds] = useState<string[]>([]);
-
-  const [customMeals, setCustomMeals] = useState<Meal[]>([]);
-  const [filters, setFilters] = useState<FilterOptions>({
-    searchQuery: '',
-    maxBudget: profile.budgetAmount,
-    onlyWithinBudget: false,
-    category: 'all',
-    macroFilter: 'all',
-    sortBy: 'match',
-    allergySafeOnly: false,
-    desiredFoodFilter: 'all'
-  });
-
-  const handleCompleteOnboarding = (newProfile: UserProfile) => {
-    setProfile(newProfile);
-    setIsOnboardingActive(false);
+    setLoading(false);
   };
 
-  const allMeals = useMemo(() => [...customMeals, ...MEALS_DATABASE], [customMeals]);
-  const categories = useMemo(() => Array.from(new Set(MEALS_DATABASE.map(m => m.category))), []);
-
-  if (isOnboardingActive) {
-    return (
-      <OnboardingFlow
-        currentProfile={profile}
-        onComplete={handleCompleteOnboarding}
-        onCancel={() => setIsOnboardingActive(false)}
-        canCancel={!!profile.name}
-      />
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-stone-900 flex flex-col font-sans">
-      <Header
-        profile={profile}
-        onEditProfile={() => setIsOnboardingActive(true)}
-        onOpenAiRecipe={() => setIsAiModalOpen(true)}
-        onExportAllSheets={() => setIsSheetsModalOpen(true)}
-        onOpenProModal={() => setIsProModalOpen(true)}
-      />
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-6">
-        <h2 className="text-2xl font-black mb-4">Afiyet olsun, {profile.name || 'Misafir'}!</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {allMeals.map((meal) => (
-            <MealCard
-              key={meal.id}
-              meal={meal}
-              profile={profile}
-              onSelect={(m) => setSelectedMeal(m)}
-              isUnlocked={true}
-            />
-          ))}
-        </div>
-      </main>
-      <MealDetailModal meal={selectedMeal} onClose={() => setSelectedMeal(null)} profile={profile} />
-      <AiRecipeModal isOpen={isAiModalOpen} onClose={() => setIsAiModalOpen(false)} profile={profile} />
+    <div style={{ minHeight: '100vh', backgroundColor: '#f3f4f6', padding: '20px', fontFamily: 'sans-serif' }}>
+      <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', padding: '24px', borderRadius: '12px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+        <h1 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#16a34a', marginTo: 0 }}>
+          <Utensils /> Tarif Sepeti
+        </h1>
+        <p style={{ color: '#4b5563' }}>Elinizdeki malzemeleri yazın, yapay zeka size özel tarif üretsin!</p>
+        
+        <textarea
+          style={{ width: '100%', padding: '12px', borderRadius: '8px', border: '1px solid #d1d5db', boxSizing: 'border-box', marginBottom: '12px' }}
+          rows={3}
+          placeholder="Örn: Domates, yumurta, biber, peynir..."
+          value={ing}
+          onChange={(e) => setIng(e.target.value)}
+        />
+
+        <button
+          onClick={getRecipes}
+          disabled={loading}
+          style={{ width: '100%', padding: '12px', backgroundColor: '#16a34a', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '8px' }}
+        >
+          <Sparkles size={18} /> {loading ? 'Tarif Hazırlanıyor...' : 'Tarif Bul'}
+        </button>
+
+        {recipes && (
+          <div style={{ marginTop: '20px', padding: '16px', backgroundColor: '#f9fafb', borderRadius: '8px', borderLeft: '4px solid #16a34a', whiteSpace: 'pre-wrap' }}>
+            {recipes}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
-export default App;
